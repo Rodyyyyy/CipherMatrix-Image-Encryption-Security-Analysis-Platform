@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>CipherMatrix | Next‑Gen Image Encryption</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --accent: #7c3aed; --glow: #a855f7; --danger: #ef4444; --warn: #f59e0b; --ok: #22c55e; }
+        body { font-family: 'DM Sans', sans-serif; background: #020617; color: #e2e8f0; overflow-x: hidden; }
+        h1, h2, .serif { font-family: 'Cormorant Garamond', serif; }
+        #galaxy-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; display: block; }
+        .ambient-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at 30% 40%, rgba(2,6,23,0.5) 0%, rgba(2,6,23,0.85) 100%); z-index: -1; pointer-events: none; }
+        .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .method-pill { transition: all 0.3s ease; border: 1px solid rgba(255, 255, 255, 0.1); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+        .method-pill:hover, .method-pill.active { background: rgba(124, 58, 237, 0.3); border-color: var(--accent); color: white; box-shadow: 0 0 18px rgba(124, 58, 237, 0.4); transform: scale(1.02); }
+        .canvas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.8rem; min-height: 420px; }
+        .preview-img { max-height: 320px; width: auto; object-fit: contain; transition: transform 0.4s ease, opacity 0.4s ease; }
+        .preview-img.loaded { animation: imgReveal 0.5s ease-out; }
+        @keyframes imgReveal {
+            0% { transform: scale(0.95); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @media (max-width: 1024px) { .canvas-grid { grid-template-columns: 1fr; } .preview-img { max-height: 280px; } }
+        .carousel-section { position: relative; width: 100%; overflow: hidden; user-select: none; }
+        .carousel-track { display: flex; gap: 1.8rem; transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.4, 1.1); will-change: transform; }
+        .tilted-card-container { flex: 0 0 auto; width: 240px; height: 300px; perspective: 1200px; cursor: pointer; }
+        .tilted-card { position: relative; width: 100%; height: 100%; background: linear-gradient(145deg, rgba(18, 25, 55, 0.98), rgba(10, 15, 35, 0.98)); backdrop-filter: blur(12px); border-radius: 1.8rem; border: 1px solid rgba(124, 58, 237, 0.5); box-shadow: 0 25px 35px -15px rgba(0,0,0,0.5); transition: transform 0.2s ease, box-shadow 0.2s ease; transform-style: preserve-3d; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1.2rem; }
+        .tilted-card:hover { transform: scale(1.02); box-shadow: 0 30px 45px -18px rgba(168, 85, 247, 0.4); border-color: #c084fc; }
+        .tilted-card-content { transform: translateZ(20px); backface-visibility: hidden; }
+        .card-icon { font-size: 2.4rem; margin-bottom: 0.5rem; filter: drop-shadow(0 0 8px #a855f7); color: #c084fc; }
+        .tilted-card h3 { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #e9d5ff, #c084fc); background-clip: text; -webkit-background-clip: text; color: transparent; margin-bottom: 0.4rem; }
+        .method-tag { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; color: #c084fc; background: rgba(124, 58, 237, 0.2); padding: 0.2rem 0.6rem; border-radius: 30px; display: inline-block; margin-bottom: 0.6rem; }
+        .tilted-card p { font-size: 0.75rem; line-height: 1.4; color: #cbd5e1; margin-top: 0.3rem; }
+        .card-footer { margin-top: 0.8rem; font-size: 0.65rem; font-family: monospace; color: #a78bfa; opacity: 0.7; }
+        .carousel-dots { display: flex; justify-content: center; gap: 14px; margin-top: 28px; flex-wrap: wrap; }
+        .nav-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.25); transition: all 0.25s ease-out; cursor: pointer; }
+        .nav-dot:hover { background: #d8b4fe; transform: scale(1.35); box-shadow: 0 0 10px #c084fc; }
+        .nav-dot.active { background: #c084fc; width: 28px; border-radius: 12px; box-shadow: 0 0 14px #a855f7; }
+        .stat-card { background: rgba(0,0,0,0.4); border-radius: 1rem; padding: 0.75rem; text-align: center; }
+        #histOriginal, #histEncrypted { max-height: 150px; width: 100%; }
+        .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+        @media (max-width: 768px) { .tilted-card-container { width: 220px; height: 280px; } .tilted-card h3 { font-size: 1.3rem; } }
+        button:active { transform: scale(0.97); }
+        #drop-zone { transition: all 0.2s; }
+        .result-border-glow { transition: box-shadow 0.5s; }
+        .result-border-glow.has-result { box-shadow: 0 0 30px rgba(168, 85, 247, 0.5); }
+        .method-pill.active { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 10px rgba(124, 58, 237, 0.4); } 50% { box-shadow: 0 0 25px rgba(168, 85, 247, 0.7); } 100% { box-shadow: 0 0 10px rgba(124, 58, 237, 0.4); } }
+
+        /* ---- ATTACK SECTION STYLES ---- */
+        .attack-pill { transition: all 0.3s ease; border: 1px solid rgba(255,255,255,0.1); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+        .attack-pill:hover, .attack-pill.active { background: rgba(239,68,68,0.2); border-color: #ef4444; color: white; box-shadow: 0 0 18px rgba(239,68,68,0.35); transform: scale(1.02); }
+        .attack-method-pill { transition: all 0.3s ease; border: 1px solid rgba(255,255,255,0.08); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: 0.7rem; padding: 0.3rem 0.75rem; border-radius: 9999px; font-weight: 700; }
+        .attack-method-pill:hover, .attack-method-pill.active { background: rgba(239,68,68,0.2); border-color: #f87171; color: white; box-shadow: 0 0 14px rgba(239,68,68,0.3); }
+        .resistance-bar-track { width: 100%; height: 10px; border-radius: 99px; background: rgba(255,255,255,0.07); overflow: hidden; }
+        .resistance-bar-fill { height: 100%; border-radius: 99px; transition: width 1s ease, background 0.5s ease; }
+        .res-strong { background: linear-gradient(90deg, #22c55e, #4ade80); }
+        .res-moderate { background: linear-gradient(90deg, #f59e0b, #fcd34d); }
+        .res-weak { background: linear-gradient(90deg, #f97316, #fb923c); }
+        .res-vulnerable { background: linear-gradient(90deg, #ef4444, #f87171); }
+        .attack-canvas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 900px) { .attack-canvas-grid { grid-template-columns: 1fr; } }
+        .attack-metric-card { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.07); border-radius: 0.9rem; padding: 0.9rem 1rem; }
+        .metric-value { font-family: 'Courier New', monospace; font-size: 1.1rem; font-weight: 700; }
+        .metric-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; margin-top: 0.15rem; }
+        .attack-img-panel { min-height: 200px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); border-radius: 1rem; border: 1px solid rgba(239,68,68,0.2); overflow: hidden; }
+        .atk-loader { display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); flex-direction: column; align-items: center; justify-content: center; gap: 10px; border-radius: 1rem; z-index: 10; }
+        .atk-spinner { width: 36px; height: 36px; border: 3px solid rgba(239,68,68,0.2); border-top-color: #ef4444; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .score-ring { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+        .score-ring svg { transform: rotate(-90deg); }
+        .score-ring-label { position: absolute; text-align: center; }
+        .candidate-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; padding: 0.35rem 0.6rem; border-radius: 0.5rem; background: rgba(255,255,255,0.03); margin-bottom: 0.25rem; font-family: monospace; }
+        .candidate-row:first-child { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); }
+        .npcr-bar { height: 6px; border-radius: 99px; background: linear-gradient(90deg, #ef4444, #f97316); transition: width 0.8s ease; }
+        .uaci-bar { height: 6px; border-radius: 99px; background: linear-gradient(90deg, #8b5cf6, #a855f7); transition: width 0.8s ease; }
+        .compare-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 0.5rem; align-items: center; padding: 0.5rem 0.75rem; border-radius: 0.6rem; font-size: 0.72rem; }
+        .compare-row:nth-child(odd) { background: rgba(255,255,255,0.03); }
+        .section-divider { display: flex; align-items: center; gap: 1rem; margin: 2rem 0; }
+        .section-divider::before, .section-divider::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); }
+        .danger-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.6rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 0.2rem 0.65rem; border-radius: 999px; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); color: #f87171; }
+    </style>
+</head>
+<body>
+    <div id="galaxy-bg"></div>
+    <div class="ambient-overlay"></div>
+
+    <header class="pt-12 pb-6 text-center px-6 relative z-10">
+        <h1 class="text-7xl font-bold text-white mb-3 tracking-tight drop-shadow-2xl">CipherMatrix</h1>
+        <p class="text-slate-300 text-lg font-medium max-w-2xl mx-auto">Next‑Gen Image Encryption Vault</p>
+    </header>
+
+    <main class="max-w-[1600px] mx-auto px-6 pb-16 relative z-10">
+
+        <!-- Carousel -->
+        <div class="glass rounded-[2.5rem] p-6 mb-8 backdrop-blur-xl">
+            <div class="flex items-center gap-2 mb-4 px-2">
+                <span class="text-xs font-bold uppercase tracking-widest text-violet-300 bg-violet-900/40 px-3 py-1 rounded-full">✦ Encryption Methods</span>
+                <span class="text-xs text-slate-400">10 advanced techniques — hover dots to navigate</span>
+            </div>
+            <div class="carousel-section"><div id="carouselTrack" class="carousel-track"></div></div>
+            <div id="carouselDots" class="carousel-dots"></div>
+        </div>
+
+
+
+        <!-- Workspace -->
+        <div class="glass rounded-[3rem] p-7 space-y-7">
+            <div class="flex flex-wrap items-center justify-between gap-6 pb-6 border-b border-white/10">
+                <div id="normalSelector" class="flex flex-wrap gap-2">
+                    <button class="method-pill active px-4 py-2 rounded-full text-xs font-bold" data-val="DCT"><i class="fas fa-chart-line"></i> DCT</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="DWT"><i class="fas fa-water"></i> DWT</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="FFT"><i class="fas fa-chart-bar"></i> FFT</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="Chaos"><i class="fas fa-infinity"></i> Chaos</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="DNA"><i class="fas fa-dna"></i> DNA</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="ECC"><i class="fas fa-key"></i> ECC</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="AES"><i class="fas fa-shield-alt"></i> AES</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="CellularAutomata"><i class="fas fa-th"></i> Cellular</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="CompressiveSensing"><i class="fas fa-compress"></i> CS</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="RubikCube"><i class="fas fa-cube"></i> Rubik</button>
+                </div>
+                <div id="hybridSelector" class="hidden w-full md:w-auto">
+                    <div class="text-xs text-violet-300 mb-2">First method</div><div id="hybridMethod1" class="flex flex-wrap gap-2 mb-4"></div>
+                    <div class="text-xs text-violet-300 mb-2">Second method</div><div id="hybridMethod2" class="flex flex-wrap gap-2"></div>
+                </div>
+                <div class="flex items-center gap-5">
+                    <label class="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-300"><span>Hybrid Mode</span>
+                        <div class="relative"><input type="checkbox" id="hybrid-toggle" class="sr-only peer"><div class="w-11 h-6 bg-slate-700 rounded-full peer-checked:bg-violet-600 transition-all duration-200 cursor-pointer"></div><div class="absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-all duration-200 peer-checked:translate-x-5 pointer-events-none"></div></div>
+                    </label>
+                    <button id="encrypt-btn" class="bg-violet-600 hover:bg-violet-500 px-5 py-2.5 rounded-xl font-bold text-white shadow-lg shadow-violet-900/50 flex items-center gap-2"><i class="fas fa-lock"></i> Encrypt</button>
+                </div>
+            </div>
+
+            <!-- Inline Key Panel (shown for key-based methods) -->
+            <div id="inlineKeyPanel" class="hidden border border-violet-500/20 bg-violet-950/20 rounded-2xl p-5 mt-1 mb-2">
+                <div class="flex items-center gap-2 mb-4">
+                    <i class="fas fa-key text-violet-400 text-sm"></i>
+                    <span class="text-sm font-bold text-violet-300">Encryption Key</span>
+                    <span id="keyMethodBadge" class="text-xs bg-violet-900/60 border border-violet-500/30 text-violet-200 px-2 py-0.5 rounded-full font-mono"></span>
+                    <span id="activeKeyBadge" class="hidden text-xs bg-emerald-900/60 border border-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded-full"><i class="fas fa-check-circle mr-1"></i><span id="activeKeyText">Key active</span></span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Generate -->
+                    <div class="bg-black/30 rounded-xl p-4 space-y-3">
+                        <div class="text-xs font-semibold text-slate-300 uppercase tracking-widest"><i class="fas fa-dice mr-1 text-violet-400"></i> Generate Random Key</div>
+                        <div class="flex gap-2">
+                            <button id="generateKeyBtn" class="flex-1 bg-violet-700/50 hover:bg-violet-600 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                                <i class="fas fa-wand-magic-sparkles mr-1"></i> Generate &amp; Use
+                            </button>
+                        </div>
+                        <div id="chaosSeedRow" class="hidden">
+                            <label class="text-xs text-slate-400 block mb-1">Custom seed (Chaos only):</label>
+                            <div class="flex gap-2">
+                                <input id="manualSeedInput" type="text" placeholder="e.g. 0.42" class="bg-black/40 border border-white/20 rounded-lg px-3 py-1.5 text-xs flex-1 placeholder:text-slate-500">
+                                <button id="applySeedBtn" class="bg-violet-700/50 hover:bg-violet-600 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition">Use Seed</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Manual -->
+                    <div class="bg-black/30 rounded-xl p-4 space-y-3">
+                        <div class="text-xs font-semibold text-slate-300 uppercase tracking-widest"><i class="fas fa-pencil-alt mr-1 text-emerald-400"></i> Enter Key Manually</div>
+                        <div id="manualKeyHint" class="text-xs text-slate-400"></div>
+                        <div class="flex gap-2">
+                            <input id="customKeyInput" type="text" placeholder="Enter your key..." class="bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-sm flex-1 placeholder:text-slate-500">
+                            <button id="applyCustomKeyBtn" class="bg-emerald-700/50 hover:bg-emerald-600 px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition">
+                                <i class="fas fa-check mr-1"></i> Use
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between">
+                    <div class="text-xs text-slate-500" id="selectedKeyDisplay">No key selected — will use default</div>
+                    <button id="clearKeyBtn" class="hidden text-xs text-red-400 hover:text-red-300 transition"><i class="fas fa-times mr-1"></i>Clear key</button>
+                </div>
+                <!-- Hidden select for compat -->
+                <select id="encryptKeySelect" class="hidden">
+                    <option value="">No Key (uses default)</option>
+                </select>
+            </div>
+
+            <!-- Image canvases -->
+            <div class="canvas-grid">
+                <div class="flex flex-col bg-black/30 rounded-2xl border border-white/10 backdrop-blur-sm overflow-hidden">
+                    <div class="p-3 px-5 flex justify-between items-center border-b border-white/10 bg-black/20"><span class="text-xs font-bold uppercase tracking-widest text-slate-400"><i class="fas fa-camera mr-1"></i> Source Canvas</span><button id="upload-trigger" class="text-xs text-violet-300 hover:text-white font-bold">↻ Change Image</button></div>
+                    <div id="drop-zone" class="flex-1 flex items-center justify-center p-5 cursor-pointer group min-h-[280px]">
+                        <input type="file" id="file-input" class="hidden" accept="image/*">
+                        <img id="source-img" class="preview-img max-w-full rounded-xl shadow-xl hidden">
+                        <div id="source-empty" class="text-center group-hover:scale-105 transition-transform duration-300"><div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-sm"><i class="fas fa-image text-3xl text-slate-400"></i></div><p class="text-slate-400 font-semibold text-sm">Drag & Drop or Click</p><p class="text-xs text-slate-500 mt-1">PNG / JPG / WEBP</p></div>
+                    </div>
+                </div>
+                <div class="flex flex-col bg-black/30 rounded-2xl border border-white/10 backdrop-blur-sm overflow-hidden result-border-glow" id="resultContainer">
+                    <div class="p-3 px-5 flex justify-between items-center border-b border-white/10 bg-black/20"><span class="text-xs font-bold uppercase tracking-widest text-violet-300"><i class="fas fa-lock mr-1"></i> Encrypted Result</span><a id="dl-btn" href="#" download="encrypted.png" class="hidden text-xs text-violet-300 font-bold hover:text-white">⬇ Download</a></div>
+                    <div class="flex-1 flex items-center justify-center p-5 relative min-h-[280px]">
+                        <img id="result-img" class="preview-img max-w-full rounded-xl shadow-xl hidden">
+                        <div id="result-empty" class="text-slate-400 font-bold text-sm text-center"><i class="fas fa-wand-sparkles mr-1"></i> Awaiting encryption</div>
+                        <div id="loader" class="hidden absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center rounded-2xl"><div class="flex flex-col items-center gap-2"><div class="w-10 h-10 border-4 border-violet-400/30 border-t-violet-500 rounded-full animate-spin"></div><span class="text-white text-xs font-mono">encrypting...</span></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis -->
+            <div class="mt-6 pt-4 border-t border-white/10">
+                <h3 class="font-bold text-md mb-3"><i class="fas fa-chart-simple text-violet-400 mr-2"></i>Statistical Analysis (Original vs Encrypted)</h3>
+                <div class="comparison-grid">
+                    <div class="bg-black/30 rounded-xl p-3">
+                        <div class="text-center text-xs text-slate-400 mb-2">Original Image</div>
+                        <canvas id="histOriginal" width="400" height="150" style="max-height:150px; width:100%"></canvas>
+                        <div class="flex justify-between mt-2 text-xs"><span>Entropy: <span id="entropyOriginal">—</span></span><span>Corr (H/V/D): <span id="corrOriginal">—/—/—</span></span></div>
+                    </div>
+                    <div class="bg-black/30 rounded-xl p-3">
+                        <div class="text-center text-xs text-slate-400 mb-2">Encrypted Image</div>
+                        <canvas id="histEncrypted" width="400" height="150" style="max-height:150px; width:100%"></canvas>
+                        <div class="flex justify-between mt-2 text-xs"><span>Entropy: <span id="entropyEncrypted">—</span></span><span>Corr (H/V/D): <span id="corrEncrypted">—/—/—</span></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+            </div><!-- end inlineKeyPanel -->
+
+        <!-- ============================================================ -->
+        <!-- DECRYPTION SECTION -->
+        <!-- ============================================================ -->
+        <div class="section-divider mt-10">
+            <span class="text-xs font-bold tracking-widest text-emerald-400/70 uppercase">Decryption</span>
+        </div>
+
+        <div class="glass rounded-[2.5rem] p-7 mt-2 mb-8">
+            <div class="flex flex-wrap items-start justify-between gap-4 mb-6">
+                <div>
+                    <div class="flex items-center gap-3 mb-1">
+                        <i class="fas fa-lock-open text-emerald-400 text-xl"></i>
+                        <h2 class="text-2xl font-bold text-white" style="font-family:'Cormorant Garamond',serif;">Decrypt Image</h2>
+                    </div>
+                    <p class="text-slate-400 text-sm max-w-xl">Upload an encrypted image, select the method used to encrypt it, provide the key, and recover the original.</p>
+                </div>
+            </div>
+
+            <!-- Method selector -->
+            <div class="mb-5">
+                <div class="text-xs text-slate-400 mb-2 font-semibold uppercase tracking-widest">Encryption Method Used</div>
+                <div id="decryptMethodPills" class="flex flex-wrap gap-2">
+                    <button class="method-pill active px-4 py-2 rounded-full text-xs font-bold" data-val="DCT"><i class="fas fa-chart-line"></i> DCT</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="DWT"><i class="fas fa-water"></i> DWT</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="FFT"><i class="fas fa-chart-bar"></i> FFT</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="Chaos"><i class="fas fa-infinity"></i> Chaos</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="DNA"><i class="fas fa-dna"></i> DNA</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="ECC"><i class="fas fa-key"></i> ECC</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="AES"><i class="fas fa-shield-alt"></i> AES</button>
+                    <button class="method-pill px-4 py-2 rounded-full text-xs font-bold" data-val="RubikCube"><i class="fas fa-cube"></i> Rubik</button>
+                </div>
+            </div>
+
+            <!-- Decryption Key Panel (inline, shown for key-based methods) -->
+            <div id="decryptKeyPanel" class="hidden border border-emerald-500/20 bg-emerald-950/10 rounded-2xl p-4 mb-5">
+                <div class="flex items-center gap-2 mb-3">
+                    <i class="fas fa-key text-emerald-400 text-sm"></i>
+                    <span class="text-sm font-bold text-emerald-300">Decryption Key</span>
+                    <span id="decryptKeyMethodBadge" class="text-xs bg-emerald-900/60 border border-emerald-500/30 text-emerald-200 px-2 py-0.5 rounded-full font-mono"></span>
+                </div>
+                <div id="decryptKeyHint" class="text-xs text-slate-400 mb-3"></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 rounded-xl p-3 space-y-2">
+                        <div class="text-xs font-semibold text-slate-300 uppercase tracking-widest"><i class="fas fa-dice mr-1 text-emerald-400"></i> Generate Key</div>
+                        <button id="decryptGenerateKeyBtn" class="w-full bg-emerald-700/50 hover:bg-emerald-600 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                            <i class="fas fa-wand-magic-sparkles mr-1"></i> Generate &amp; Use
+                        </button>
+                        <div id="decryptChaosSeedRow" class="hidden">
+                            <div class="flex gap-2 mt-2">
+                                <input id="decryptManualSeed" type="text" placeholder="Custom seed e.g. 0.42" class="bg-black/40 border border-white/20 rounded-lg px-3 py-1.5 text-xs flex-1 placeholder:text-slate-500">
+                                <button id="decryptApplySeedBtn" class="bg-emerald-700/50 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-xs font-semibold transition">Use Seed</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-black/30 rounded-xl p-3 space-y-2">
+                        <div class="text-xs font-semibold text-slate-300 uppercase tracking-widest"><i class="fas fa-pencil-alt mr-1 text-violet-400"></i> Enter Key Manually</div>
+                        <div class="flex gap-2">
+                            <input id="decryptCustomKeyInput" type="text" placeholder="Enter your key..." class="bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-sm flex-1 placeholder:text-slate-500">
+                            <button id="decryptApplyCustomKeyBtn" class="bg-violet-700/50 hover:bg-violet-600 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                                <i class="fas fa-check mr-1"></i> Use
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between">
+                    <div class="text-xs text-slate-500" id="decryptSelectedKeyDisplay">No key selected — will use default</div>
+                    <button id="decryptClearKeyBtn" class="hidden text-xs text-red-400 hover:text-red-300 transition"><i class="fas fa-times mr-1"></i>Clear</button>
+                </div>
+                <select id="decryptKeySelect" class="hidden"><option value="">No Key</option></select>
+            </div>
+
+            <!-- Image canvases -->
+            <div class="canvas-grid">
+                <div class="flex flex-col bg-black/30 rounded-2xl border border-white/10 backdrop-blur-sm overflow-hidden">
+                    <div class="p-3 px-5 flex justify-between items-center border-b border-white/10 bg-black/20">
+                        <span class="text-xs font-bold uppercase tracking-widest text-slate-400"><i class="fas fa-lock mr-1"></i> Encrypted Image</span>
+                        <button id="decrypt-upload-trigger" class="text-xs text-emerald-300 hover:text-white font-bold">↻ Change</button>
+                    </div>
+                    <div id="decrypt-drop-zone" class="flex-1 flex items-center justify-center p-5 cursor-pointer group min-h-[280px]">
+                        <input type="file" id="decrypt-file-input" class="hidden" accept="image/*">
+                        <img id="decrypt-source-img" class="preview-img max-w-full rounded-xl shadow-xl hidden">
+                        <div id="decrypt-source-empty" class="text-center group-hover:scale-105 transition-transform duration-300">
+                            <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-sm"><i class="fas fa-image text-3xl text-slate-400"></i></div>
+                            <p class="text-slate-400 font-semibold text-sm">Upload Encrypted Image</p>
+                            <p class="text-xs text-slate-500 mt-1">PNG / JPG / WEBP</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-col bg-black/30 rounded-2xl border border-white/10 backdrop-blur-sm overflow-hidden result-border-glow" id="decryptResultContainer">
+                    <div class="p-3 px-5 flex justify-between items-center border-b border-white/10 bg-black/20">
+                        <span class="text-xs font-bold uppercase tracking-widest text-emerald-300"><i class="fas fa-lock-open mr-1"></i> Decrypted Result</span>
+                        <a id="decrypt-dl-btn" href="#" download="decrypted.png" class="hidden text-xs text-emerald-300 font-bold hover:text-white">⬇ Download</a>
+                    </div>
+                    <div class="flex-1 flex items-center justify-center p-5 relative min-h-[280px]">
+                        <img id="decrypt-result-img" class="preview-img max-w-full rounded-xl shadow-xl hidden">
+                        <div id="decrypt-result-empty" class="text-slate-400 font-bold text-sm text-center"><i class="fas fa-lock-open mr-1"></i> Awaiting decryption</div>
+                        <div id="decrypt-color-warning" class="hidden absolute bottom-0 left-0 right-0 bg-amber-900/80 text-amber-200 text-xs text-center px-4 py-2 font-mono z-10"></div>
+                        <div id="decrypt-loader" class="hidden absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center rounded-2xl">
+                            <div class="flex flex-col items-center gap-2">
+                                <div class="w-10 h-10 border-4 border-emerald-400/30 border-t-emerald-500 rounded-full animate-spin"></div>
+                                <span class="text-white text-xs font-mono">decrypting...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Decrypt button -->
+            <div class="flex justify-end mt-5">
+                <button id="decrypt-btn" class="bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 rounded-xl font-bold text-white shadow-lg shadow-emerald-900/40 flex items-center gap-2 transition">
+                    <i class="fas fa-lock-open"></i> Decrypt
+                </button>
+            </div>
+
+            <!-- Non-invertible notice -->
+            <div id="decryptNonInvertibleNotice" class="hidden mt-4 text-xs text-amber-300 bg-amber-900/20 border border-amber-500/30 rounded-xl px-4 py-3">
+                <i class="fas fa-triangle-exclamation mr-1"></i>
+                <strong>Note:</strong> The selected method (<span id="nonInvertibleMethodName"></span>) is a one-way transform and cannot be reversed to recover the original image.
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- ATTACK SECTION -->
+        <!-- ============================================================ -->
+        <div class="section-divider mt-10">
+            <span class="text-xs font-bold tracking-widest text-red-400/70 uppercase">Attack Simulator</span>
+        </div>
+
+        <div class="glass rounded-[2.5rem] p-7 mt-2 mb-8" id="attackSection">
+            <!-- Header -->
+            <div class="flex flex-wrap items-start justify-between gap-4 mb-6">
+                <div>
+                    <div class="flex items-center gap-3 mb-1">
+                        <i class="fas fa-skull-crossbones text-red-400 text-xl"></i>
+                        <h2 class="text-2xl font-bold text-white" style="font-family:'Cormorant Garamond',serif;">Cryptanalysis Attack Lab</h2>
+                        <span class="danger-badge"><i class="fas fa-radiation mr-1"></i> Offensive</span>
+                    </div>
+                    <p class="text-slate-400 text-sm max-w-xl">Test the resilience of your encrypted image against real-world cryptographic attacks. Encrypt an image first, then run attacks below.</p>
+                </div>
+                <div class="flex items-center gap-3 bg-red-900/10 border border-red-500/20 rounded-xl px-4 py-2">
+                    <i class="fas fa-image text-red-400 text-sm"></i>
+                    <div>
+                        <div class="text-xs text-slate-400">Target Image</div>
+                        <div id="attackTargetLabel" class="text-xs font-bold text-red-300 font-mono">No encrypted image yet</div>
+                    </div>
+                    <button id="useEncryptedBtn" onclick="useEncryptedAsAttackTarget()" class="bg-red-700/40 hover:bg-red-600/60 text-red-200 text-xs px-3 py-1.5 rounded-lg font-bold transition hidden">
+                        <i class="fas fa-crosshairs mr-1"></i> Use Encrypted
+                    </button>
+                </div>
+            </div>
+
+            <!-- Attack method selector -->
+            <div class="mb-6">
+                <div class="text-xs text-slate-400 mb-2 font-semibold uppercase tracking-widest">Encryption Method of Target</div>
+                <div id="attackMethodPills" class="flex flex-wrap gap-2">
+                    <!-- filled by JS -->
+                </div>
+            </div>
+
+            <!-- Attack type selector -->
+            <div class="flex flex-wrap gap-3 mb-7 pb-6 border-b border-white/10">
+                <button id="btnBruteForce" class="attack-pill px-5 py-2.5 rounded-xl text-sm font-bold active" onclick="selectAttack('brute_force')">
+                    <i class="fas fa-hammer"></i> Brute Force Attack
+                </button>
+                <button id="btnDifferential" class="attack-pill px-5 py-2.5 rounded-xl text-sm font-bold" onclick="selectAttack('differential')">
+                    <i class="fas fa-code-branch"></i> Differential Attack
+                </button>
+                <button id="btnCompareAll" class="attack-pill px-5 py-2.5 rounded-xl text-sm font-bold" onclick="selectAttack('compare_all')">
+                    <i class="fas fa-scale-balanced"></i> Full Comparison
+                </button>
+                <div class="flex-1"></div>
+                <button id="runAttackBtn" onclick="runAttack()" class="bg-red-600 hover:bg-red-500 text-white font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-red-900/40 transition">
+                    <i class="fas fa-bolt"></i> Launch Attack
+                </button>
+            </div>
+
+            <!-- Attack description -->
+            <div id="attackDescription" class="mb-6 text-sm text-slate-300 bg-black/30 rounded-xl px-4 py-3 border border-white/5 leading-relaxed">
+                <span class="text-red-400 font-bold">Brute Force:</span> Systematically tries candidate keys/seeds for the target method and measures how close each attempt matches the encrypted image using PSNR and correlation. Higher resistance = harder to crack.
+            </div>
+
+            <!-- Attack results area -->
+            <div id="attackResults" class="hidden">
+                <!-- BRUTE FORCE RESULTS -->
+                <div id="bfResults" class="hidden">
+                    <div class="attack-canvas-grid mb-6">
+                        <!-- Left: attack image + metrics -->
+                        <div>
+                            <div class="text-xs text-slate-400 mb-2 uppercase tracking-widest font-semibold">Best Key Attempt — Re-encrypted Output</div>
+                            <div class="attack-img-panel relative" id="bfImgPanel">
+                                <div class="atk-loader" id="bfLoader" style="display:flex;">
+                                    <div class="atk-spinner"></div>
+                                    <span class="text-xs text-red-300 font-mono">running brute force...</span>
+                                </div>
+                                <img id="bfAttackImg" class="max-w-full max-h-64 rounded-lg hidden object-contain">
+                                <div id="bfImgEmpty" class="text-slate-500 text-xs">Attack image will appear here</div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 mt-3">
+                                <div class="attack-metric-card text-center">
+                                    <div class="metric-value text-yellow-400" id="bfPsnr">—</div>
+                                    <div class="metric-label">Best PSNR (dB)</div>
+                                </div>
+                                <div class="attack-metric-card text-center">
+                                    <div class="metric-value text-purple-400" id="bfCorr">—</div>
+                                    <div class="metric-label">Correlation</div>
+                                </div>
+                                <div class="attack-metric-card text-center">
+                                    <div class="metric-value text-blue-400" id="bfElapsed">—</div>
+                                    <div class="metric-label">Time (s)</div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Right: resistance score + candidate list -->
+                        <div>
+                            <div class="text-xs text-slate-400 mb-2 uppercase tracking-widest font-semibold">Resistance Assessment</div>
+                            <div class="attack-metric-card mb-4 flex items-center justify-between gap-4">
+                                <div class="score-ring" style="width:90px;height:90px;">
+                                    <svg width="90" height="90" viewBox="0 0 90 90">
+                                        <circle cx="45" cy="45" r="38" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="9"/>
+                                        <circle id="bfScoreCircle" cx="45" cy="45" r="38" fill="none" stroke="#22c55e" stroke-width="9" stroke-linecap="round" stroke-dasharray="238.76" stroke-dashoffset="238.76" style="transition:stroke-dashoffset 1s ease,stroke 0.5s ease;"/>
+                                    </svg>
+                                    <div class="score-ring-label">
+                                        <div class="text-lg font-bold text-white" id="bfScoreNum">—</div>
+                                        <div class="text-xs text-slate-400">/ 100</div>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="text-xl font-bold" id="bfScoreLabel">—</div>
+                                    <div class="text-xs text-slate-400 mt-1" id="bfCandidates">Testing candidates...</div>
+                                    <div class="text-xs text-slate-400" id="bfBestKey">Best key: —</div>
+                                </div>
+                            </div>
+                            <div class="text-xs text-slate-400 mb-2 uppercase tracking-widest font-semibold">Top Candidates Tried</div>
+                            <div id="bfCandidateList" class="space-y-1 max-h-48 overflow-y-auto pr-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DIFFERENTIAL RESULTS -->
+                <div id="diffResults" class="hidden">
+                    <div class="attack-canvas-grid mb-6">
+                        <!-- Left: diff image -->
+                        <div>
+                            <div class="text-xs text-slate-400 mb-2 uppercase tracking-widest font-semibold">Pixel Difference Heatmap</div>
+                            <div class="attack-img-panel relative" id="diffImgPanel">
+                                <div class="atk-loader" id="diffLoader" style="display:flex;">
+                                    <div class="atk-spinner"></div>
+                                    <span class="text-xs text-red-300 font-mono">analyzing differentials...</span>
+                                </div>
+                                <img id="diffAttackImg" class="max-w-full max-h-64 rounded-lg hidden object-contain">
+                                <div id="diffImgEmpty" class="text-slate-500 text-xs">Heatmap will appear here</div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 mt-3">
+                                <div class="attack-metric-card">
+                                    <div class="metric-value text-orange-400" id="diffNpcr">—</div>
+                                    <div class="metric-label">Avg NPCR %</div>
+                                    <div class="text-xs text-slate-500 mt-1">Ideal ≈ 99.6%</div>
+                                    <div class="resistance-bar-track mt-2"><div class="npcr-bar" id="npcrBar" style="width:0%"></div></div>
+                                </div>
+                                <div class="attack-metric-card">
+                                    <div class="metric-value text-purple-400" id="diffUaci">—</div>
+                                    <div class="metric-label">Avg UACI %</div>
+                                    <div class="text-xs text-slate-500 mt-1">Ideal ≈ 33.4%</div>
+                                    <div class="resistance-bar-track mt-2"><div class="uaci-bar" id="uaciBar" style="width:0%"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Right: per-position breakdown + resistance -->
+                        <div>
+                            <div class="text-xs text-slate-400 mb-2 uppercase tracking-widest font-semibold">Resistance Assessment</div>
+                            <div class="attack-metric-card mb-4 flex items-center justify-between gap-4">
+                                <div class="score-ring" style="width:90px;height:90px;">
+                                    <svg width="90" height="90" viewBox="0 0 90 90">
+                                        <circle cx="45" cy="45" r="38" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="9"/>
+                                        <circle id="diffScoreCircle" cx="45" cy="45" r="38" fill="none" stroke="#22c55e" stroke-width="9" stroke-linecap="round" stroke-dasharray="238.76" stroke-dashoffset="238.76" style="transition:stroke-dashoffset 1s ease,stroke 0.5s ease;"/>
+                                    </svg>
+                                    <div class="score-ring-label">
+                                        <div class="text-lg font-bold text-white" id="diffScoreNum">—</div>
+                                        <div class="text-xs text-slate-400">/ 100</div>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="text-xl font-bold" id="diffScoreLabel">—</div>
+                                    <div class="text-xs text-slate-400 mt-1">Avalanche effect analysis</div>
+                                    <div class="text-xs text-slate-400" id="diffElapsedLabel">Time: —</div>
+                                </div>
+                            </div>
+                            <div class="text-xs text-slate-400 mb-2 uppercase tracking-widest font-semibold">Per-position Results</div>
+                            <div id="diffPositionList" class="space-y-1 max-h-48 overflow-y-auto pr-1"></div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-400 bg-black/20 rounded-xl p-3 border border-white/5">
+                        <i class="fas fa-info-circle text-blue-400 mr-1"></i>
+                        <strong>NPCR</strong> (Number of Pixel Change Rate) measures what % of pixels changed after a 1-bit flip. <strong>UACI</strong> (Unified Average Changing Intensity) measures average intensity difference. Values near ideal indicate strong avalanche effect and differential resistance.
+                    </div>
+                </div>
+
+                <!-- COMPARE ALL RESULTS -->
+                <div id="compareResults" class="hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="attack-metric-card text-center col-span-1">
+                            <div class="score-ring mx-auto" style="width:110px;height:110px;">
+                                <svg width="110" height="110" viewBox="0 0 110 110">
+                                    <circle cx="55" cy="55" r="46" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="10"/>
+                                    <circle id="cmpScoreCircle" cx="55" cy="55" r="46" fill="none" stroke="#22c55e" stroke-width="10" stroke-linecap="round" stroke-dasharray="289.03" stroke-dashoffset="289.03" style="transition:stroke-dashoffset 1.2s ease,stroke 0.5s ease;"/>
+                                </svg>
+                                <div class="score-ring-label">
+                                    <div class="text-2xl font-bold text-white" id="cmpOverallScore">—</div>
+                                    <div class="text-xs text-slate-400">Overall</div>
+                                </div>
+                            </div>
+                            <div class="text-lg font-bold mt-2" id="cmpOverallLabel">—</div>
+                            <div class="text-xs text-slate-500" id="cmpMethodLabel">—</div>
+                        </div>
+                        <div class="attack-metric-card">
+                            <div class="text-xs text-slate-400 mb-2 uppercase tracking-widest font-semibold"><i class="fas fa-hammer text-yellow-400 mr-1"></i>Brute Force</div>
+                            <div class="flex justify-between mb-1 text-sm"><span>Resistance</span><span class="font-bold" id="cmpBfScore">—</span></div>
+                            <div class="resistance-bar-track mb-3"><div class="resistance-bar-fill" id="cmpBfBar" style="width:0%"></div></div>
+                            <div class="text-xs text-slate-400">Candidates tested: <span id="cmpBfCandidates" class="text-white font-mono">—</span></div>
+                            <div class="text-xs text-slate-400">Best key: <span id="cmpBfBestKey" class="text-white font-mono">—</span></div>
+                            <div class="text-xs text-slate-400">Label: <span id="cmpBfLabel" class="font-bold">—</span></div>
+                        </div>
+                        <div class="attack-metric-card">
+                            <div class="text-xs text-slate-400 mb-2 uppercase tracking-widest font-semibold"><i class="fas fa-code-branch text-purple-400 mr-1"></i>Differential</div>
+                            <div class="flex justify-between mb-1 text-sm"><span>Resistance</span><span class="font-bold" id="cmpDiffScore">—</span></div>
+                            <div class="resistance-bar-track mb-3"><div class="resistance-bar-fill" id="cmpDiffBar" style="width:0%"></div></div>
+                            <div class="text-xs text-slate-400">NPCR: <span id="cmpNpcr" class="text-white font-mono">—</span>%</div>
+                            <div class="text-xs text-slate-400">UACI: <span id="cmpUaci" class="text-white font-mono">—</span>%</div>
+                            <div class="text-xs text-slate-400">Label: <span id="cmpDiffLabel" class="font-bold">—</span></div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-400 bg-black/20 rounded-xl p-3 border border-white/5">
+                        <i class="fas fa-shield-halved text-green-400 mr-1"></i>
+                        Combined security score from both attack vectors. A score above 85 indicates strong encryption. Below 60 suggests the cipher may be vulnerable in practice.
+                    </div>
+                </div>
+            </div>
+
+            <!-- No target placeholder -->
+            <div id="attackNoTarget" class="text-center py-16 text-slate-500">
+                <i class="fas fa-lock-open text-5xl mb-4 text-red-900/50"></i>
+                <p class="font-semibold text-slate-400">Encrypt an image first</p>
+                <p class="text-sm mt-1">The attack lab operates on your encrypted output above.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Galaxy background -->
+    <script type="module">
+        import * as THREE from 'three';
+        const container = document.getElementById('galaxy-bg');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020617);
+        scene.fog = new THREE.FogExp2(0x020617, 0.018);
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 0.8, 7.5);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+        
+        const particleCount = 22000;
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+        for (let i = 0; i < particleCount; i++) {
+            const radius = Math.pow(Math.random(), 1.2) * 6.5 + 0.5;
+            const armIdx = Math.floor(Math.random() * 3);
+            const armAngle = armIdx * Math.PI * 2 / 3;
+            const spiral = radius * 0.68;
+            let angle = armAngle + spiral + (Math.random() - 0.5) * 0.9;
+            let x, y, z;
+            if (Math.random() < 0.2) {
+                const phi = Math.random() * Math.PI * 2;
+                const rHalo = Math.pow(Math.random(), 1.4) * 8;
+                x = Math.sin(phi) * rHalo;
+                z = Math.cos(phi) * rHalo;
+                y = (Math.random() - 0.5) * 1.7;
+            } else {
+                x = Math.cos(angle) * radius;
+                z = Math.sin(angle) * radius;
+                y = Math.sin(angle * 1.6) * 0.45 * (radius / 4);
+                y += (Math.random() - 0.5) * 0.35;
+            }
+            positions[i*3] = x; positions[i*3+1] = y; positions[i*3+2] = z;
+            const hue = 0.63 + (Math.random() - 0.5) * 0.12;
+            const sat = 0.3 + Math.random() * 0.35;
+            let light = 0.5 + Math.random() * 0.5;
+            const rgb = new THREE.Color().setHSL(hue, sat, light);
+            colors[i*3] = rgb.r; colors[i*3+1] = rgb.g; colors[i*3+2] = rgb.b;
+        }
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        const canvasTex = document.createElement('canvas');
+        canvasTex.width = 32; canvasTex.height = 32;
+        const ctxTex = canvasTex.getContext('2d');
+        ctxTex.fillStyle = 'white';
+        ctxTex.beginPath(); ctxTex.arc(16, 16, 14, 0, 2*Math.PI); ctxTex.fill();
+        ctxTex.beginPath(); ctxTex.arc(16, 16, 6, 0, 2*Math.PI);
+        ctxTex.fillStyle = 'rgba(255,200,255,0.9)'; ctxTex.fill();
+        const starTexture = new THREE.CanvasTexture(canvasTex);
+        const particleMat = new THREE.PointsMaterial({ size: 0.07, map: starTexture, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.9 });
+        const starField = new THREE.Points(geometry, particleMat);
+        scene.add(starField);
+        const coreGlowMat = new THREE.MeshStandardMaterial({ color: 0x7c3aed, emissive: 0x5b21b6, emissiveIntensity: 0.7, roughness: 0.2 });
+        const coreSphere = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), coreGlowMat);
+        scene.add(coreSphere);
+        scene.add(new THREE.AmbientLight(0x111133));
+        const pointLight = new THREE.PointLight(0xa855f7, 0.65);
+        pointLight.position.set(1.5, 1.2, 2.5);
+        scene.add(pointLight);
+        let mouseX = 0, mouseY = 0, targetRotX = 0, targetRotY = 0;
+        document.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            mouseY = (e.clientY / window.innerHeight) * 2 - 1;
+            targetRotY = mouseX * 0.08; targetRotX = mouseY * 0.06;
+        });
+        let galaxyAngle = 0;
+        function animateGalaxy() {
+            galaxyAngle += 0.007;
+            starField.rotation.y = galaxyAngle;
+            starField.rotation.x = Math.sin(galaxyAngle * 0.3) * 0.03;
+            coreSphere.rotation.y += 0.005;
+            coreSphere.scale.setScalar(1 + Math.sin(Date.now() * 0.003) * 0.015);
+            starField.rotation.x += (targetRotX - starField.rotation.x) * 0.08;
+            starField.rotation.z += (targetRotY * 0.4 - starField.rotation.z) * 0.08;
+            particleMat.opacity = 0.88 + Math.sin(Date.now() * 0.0035) * 0.06;
+            particleMat.size = 0.069 + Math.sin(Date.now() * 0.005) * 0.006;
+            camera.position.x += (mouseX * 0.012 - camera.position.x) * 0.04;
+            camera.position.y += (-mouseY * 0.008 - camera.position.y) * 0.04;
+            camera.lookAt(0, 0, 0);
+            renderer.render(scene, camera);
+            requestAnimationFrame(animateGalaxy);
+        }
+        animateGalaxy();
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+
+    <!-- Application logic -->
+    <script type="module">
+        // ---------- Carousel ----------
+        const methodsData = [
+            { name: "DCT", icon: "fas fa-chart-line", tag: "Discrete Cosine Transform", desc: "Frequency domain encryption with coefficient scrambling." },
+            { name: "DWT", icon: "fas fa-water", tag: "Discrete Wavelet Transform", desc: "Multi-resolution sub-band encryption." },
+            { name: "FFT", icon: "fas fa-chart-bar", tag: "Fast Fourier Transform", desc: "Phase & magnitude manipulation in frequency domain." },
+            { name: "Chaos", icon: "fas fa-infinity", tag: "Chaotic Logistic Map", desc: "Pseudo-random sequences with extreme sensitivity." },
+            { name: "DNA", icon: "fas fa-dna", tag: "DNA Encoding", desc: "Bio-inspired encryption using nucleotide sequences." },
+            { name: "ECC", icon: "fas fa-key", tag: "Elliptic Curve Crypto", desc: "Asymmetric key cryptography on elliptic curves." },
+            { name: "AES", icon: "fas fa-shield-alt", tag: "Advanced Encryption Standard", desc: "Block cipher substitution-permutation network." },
+            { name: "CellularAutomata", icon: "fas fa-th", tag: "Cellular Automata", desc: "Rule-based evolution for pixel diffusion." },
+            { name: "CompressiveSensing", icon: "fas fa-compress", tag: "Compressive Sensing", desc: "Simultaneous sampling & compression." },
+            { name: "RubikCube", icon: "fas fa-cube", tag: "Rubik's Cube", desc: "3D matrix rotation & permutation." }
+        ];
+        const track = document.getElementById('carouselTrack');
+        const dotsContainer = document.getElementById('carouselDots');
+        const CARD_WIDTH = 240 + 28;
+        let currentIndex = 0;
+        function createCard(method) {
+            const container = document.createElement('div');
+            container.className = 'tilted-card-container';
+            container.innerHTML = `<div class="tilted-card"><div class="tilted-card-content"><div class="card-icon"><i class="${method.icon}"></i></div><div class="method-tag">${method.tag}</div><h3>${method.name}</h3><p>${method.desc}</p><div class="card-footer">✦ ${method.name.toLowerCase()}-core</div></div></div>`;
+            container.addEventListener('click', () => {
+                const pill = document.querySelector(`#normalSelector .method-pill[data-val="${method.name}"]`);
+                if (pill) pill.click();
+                scrollToCard(methodsData.findIndex(m => m.name === method.name), true);
+            });
+            return container;
+        }
+        methodsData.forEach(m => track.appendChild(createCard(m)));
+        function scrollToCard(index, smooth) {
+            currentIndex = Math.min(Math.max(index, 0), methodsData.length - 1);
+            const containerWidth = track.parentElement.clientWidth;
+            let offset = (containerWidth / 2) - (240 / 2) - (currentIndex * CARD_WIDTH);
+            offset = Math.min(0, Math.max(offset, -((methodsData.length * CARD_WIDTH) - containerWidth)));
+            track.style.transform = `translateX(${offset}px)`;
+            track.style.transition = smooth ? 'transform 0.5s cubic-bezier(0.2,0.9,0.4,1.1)' : 'none';
+            document.querySelectorAll('.nav-dot').forEach((dot, i) => dot.classList.toggle('active', i === currentIndex));
+        }
+        function buildDots() {
+            dotsContainer.innerHTML = '';
+            methodsData.forEach((_, i) => {
+                const dot = document.createElement('div');
+                dot.className = `nav-dot ${i === currentIndex ? 'active' : ''}`;
+                dot.addEventListener('mouseenter', () => scrollToCard(i, true));
+                dotsContainer.appendChild(dot);
+            });
+        }
+        buildDots();
+        window.addEventListener('resize', () => scrollToCard(currentIndex, false));
+        scrollToCard(0, false);
+
+        // ---------- State & Key Management (declared first to avoid ReferenceError) ----------
+        let selectedKeyId = null;
+        let currentMethod = 'DCT';
+        let histOriginalChart = null, histEncryptedChart = null;
+
+        const KEY_METHODS = new Set(['AES', 'Chaos', 'DNA', 'ECC']);
+        const NON_INVERTIBLE = new Set(['CellularAutomata', 'CompressiveSensing']);
+
+        function getKeyMethodForEncrypt(method) {
+            return method === 'AES' ? 'AES' : 'Chaos';
+        }
+
+        function updateInlineKeyPanel(method) {
+            const panel = document.getElementById('inlineKeyPanel');
+            const badge = document.getElementById('keyMethodBadge');
+            const hint = document.getElementById('manualKeyHint');
+            const chaosSeedRow = document.getElementById('chaosSeedRow');
+            if (KEY_METHODS.has(method)) {
+                panel.classList.remove('hidden');
+                badge.textContent = method;
+                if (method === 'AES') {
+                    hint.innerHTML = '<i class="fas fa-info-circle mr-1"></i> Enter any secret phrase — it becomes a 256-byte key.';
+                    chaosSeedRow.classList.add('hidden');
+                } else {
+                    hint.innerHTML = '<i class="fas fa-info-circle mr-1"></i> Enter a decimal between 0 and 1 (e.g. 0.314159).';
+                    chaosSeedRow.classList.toggle('hidden', method !== 'Chaos');
+                }
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+
+        function setEncryptActiveKey(keyId, fingerprint) {
+            selectedKeyId = keyId;
+            const badge = document.getElementById('activeKeyBadge');
+            const display = document.getElementById('selectedKeyDisplay');
+            const clearBtn = document.getElementById('clearKeyBtn');
+            if (keyId) {
+                badge.classList.remove('hidden');
+                document.getElementById('activeKeyText').textContent = fingerprint ? `Key: ${fingerprint}` : `Key: ${keyId.slice(0,8)}...`;
+                display.textContent = `Active key: ${keyId.slice(0,8)}...`;
+                clearBtn.classList.remove('hidden');
+                document.getElementById('encryptKeySelect').innerHTML = `<option value="${keyId}" selected>${keyId}</option>`;
+                document.getElementById('encryptKeySelect').value = keyId;
+            } else {
+                badge.classList.add('hidden');
+                display.textContent = 'No key selected — will use default';
+                clearBtn.classList.add('hidden');
+            }
+        }
+
+        document.getElementById('clearKeyBtn').onclick = () => setEncryptActiveKey(null, null);
+
+        // ---------- Method pills ----------
+        const normalPills = document.querySelectorAll('#normalSelector .method-pill');
+        normalPills.forEach(pill => {
+            pill.addEventListener('click', () => {
+                normalPills.forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                currentMethod = pill.dataset.val;
+                const targetIndex = methodsData.findIndex(m => m.name === currentMethod);
+                if (targetIndex !== -1) scrollToCard(targetIndex, true);
+                updateInlineKeyPanel(currentMethod);
+                setEncryptActiveKey(null, null);
+            });
+        });
+        updateInlineKeyPanel(currentMethod);
+
+        // ---------- Hybrid UI ----------
+        const normalDiv = document.getElementById('normalSelector');
+        const hybridDiv = document.getElementById('hybridSelector');
+        const hybridToggle = document.getElementById('hybrid-toggle');
+        let selectedMethod1 = 'DCT', selectedMethod2 = 'DWT';
+        const methodList = ['DCT','DWT','FFT','Chaos','DNA','ECC','AES','CellularAutomata','CompressiveSensing','RubikCube'];
+        const iconMap = { DCT:'fa-chart-line', DWT:'fa-water', FFT:'fa-chart-bar', Chaos:'fa-infinity', DNA:'fa-dna', ECC:'fa-key', AES:'fa-shield-alt', CellularAutomata:'fa-th', CompressiveSensing:'fa-compress', RubikCube:'fa-cube' };
+        function buildHybridSelectors() {
+            const container1 = document.getElementById('hybridMethod1');
+            const container2 = document.getElementById('hybridMethod2');
+            container1.innerHTML = ''; container2.innerHTML = '';
+            methodList.forEach(m => {
+                const btn1 = document.createElement('button');
+                btn1.className = `method-pill px-4 py-2 rounded-full text-xs font-bold ${selectedMethod1 === m ? 'active' : ''}`;
+                btn1.innerHTML = `<i class="fas ${iconMap[m]}"></i> ${m}`;
+                btn1.onclick = () => { document.querySelectorAll('#hybridMethod1 .method-pill').forEach(b => b.classList.remove('active')); btn1.classList.add('active'); selectedMethod1 = m; };
+                container1.appendChild(btn1);
+                const btn2 = document.createElement('button');
+                btn2.className = `method-pill px-4 py-2 rounded-full text-xs font-bold ${selectedMethod2 === m ? 'active' : ''}`;
+                btn2.innerHTML = `<i class="fas ${iconMap[m]}"></i> ${m}`;
+                btn2.onclick = () => { document.querySelectorAll('#hybridMethod2 .method-pill').forEach(b => b.classList.remove('active')); btn2.classList.add('active'); selectedMethod2 = m; };
+                container2.appendChild(btn2);
+            });
+        }
+        buildHybridSelectors();
+        hybridToggle.addEventListener('change', (e) => {
+            if (e.target.checked) { normalDiv.classList.add('hidden'); hybridDiv.classList.remove('hidden'); }
+            else { normalDiv.classList.remove('hidden'); hybridDiv.classList.add('hidden'); }
+        });
+
+        document.getElementById('generateKeyBtn').onclick = async () => {
+            const method = getKeyMethodForEncrypt(currentMethod);
+            try {
+                const res = await fetch('/generate_key', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ method }) });
+                if (res.ok) { const d = await res.json(); setEncryptActiveKey(d.key_id, d.fingerprint); }
+                else { const e = await res.json(); alert(e.error || 'Generation failed'); }
+            } catch(e) { alert('Server error'); }
+        };
+
+        document.getElementById('applySeedBtn').onclick = async () => {
+            const seed = document.getElementById('manualSeedInput').value.trim();
+            if (!seed) return;
+            try {
+                const res = await fetch('/generate_key', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ method: 'Chaos', seed: parseFloat(seed) }) });
+                if (res.ok) { const d = await res.json(); setEncryptActiveKey(d.key_id, d.fingerprint); document.getElementById('manualSeedInput').value = ''; }
+                else { const e = await res.json(); alert(e.error || 'Seed error'); }
+            } catch(e) { alert('Server error'); }
+        };
+
+        document.getElementById('applyCustomKeyBtn').onclick = async () => {
+            const rawKey = document.getElementById('customKeyInput').value.trim();
+            if (!rawKey) { alert('Please enter a key.'); return; }
+            const method = getKeyMethodForEncrypt(currentMethod);
+            try {
+                const res = await fetch('/generate_key', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ method, raw_key: rawKey }) });
+                if (res.ok) { const d = await res.json(); setEncryptActiveKey(d.key_id, d.fingerprint); document.getElementById('customKeyInput').value = ''; }
+                else { const e = await res.json(); alert(e.error || 'Failed'); }
+            } catch(e) { alert('Server error'); }
+        };
+
+        // ---------- Analysis ----------
+        async function analyzeAndCompare(originalUrl, encryptedUrl) {
+            async function fetchAnalysis(imgUrl) {
+                const resp = await fetch(imgUrl);
+                const blob = await resp.blob();
+                const fd = new FormData();
+                fd.append('image', blob);
+                const res = await fetch('/analyze', { method: 'POST', body: fd });
+                return res.json();
+            }
+            const [origData, encData] = await Promise.all([fetchAnalysis(originalUrl), fetchAnalysis(encryptedUrl)]);
+            document.getElementById('entropyOriginal').innerText = origData.entropy;
+            document.getElementById('entropyEncrypted').innerText = encData.entropy;
+            document.getElementById('corrOriginal').innerText = `${origData.correlation.horizontal.toFixed(3)}/${origData.correlation.vertical.toFixed(3)}/${origData.correlation.diagonal.toFixed(3)}`;
+            document.getElementById('corrEncrypted').innerText = `${encData.correlation.horizontal.toFixed(3)}/${encData.correlation.vertical.toFixed(3)}/${encData.correlation.diagonal.toFixed(3)}`;
+            if (histOriginalChart) histOriginalChart.destroy();
+            if (histEncryptedChart) histEncryptedChart.destroy();
+            const ctxOrig = document.getElementById('histOriginal').getContext('2d');
+            const ctxEnc = document.getElementById('histEncrypted').getContext('2d');
+            histOriginalChart = new Chart(ctxOrig, { type: 'line', data: { labels: Array.from({length:256},(_,i)=>i), datasets: [{ data: origData.histogram, borderColor: '#a855f7', fill: true, backgroundColor: 'rgba(168,85,247,0.2)', tension: 0.1 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } } } });
+            histEncryptedChart = new Chart(ctxEnc, { type: 'line', data: { labels: Array.from({length:256},(_,i)=>i), datasets: [{ data: encData.histogram, borderColor: '#f97316', fill: true, backgroundColor: 'rgba(249,115,22,0.2)', tension: 0.1 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } } } });
+        }
+
+        // ---------- Encryption ----------
+        const fileInput = document.getElementById('file-input');
+        const sourceImg = document.getElementById('source-img');
+        const resultImg = document.getElementById('result-img');
+        const sourceEmpty = document.getElementById('source-empty');
+        const resultEmptyDiv = document.getElementById('result-empty');
+        const dlBtn = document.getElementById('dl-btn');
+        const encryptBtn = document.getElementById('encrypt-btn');
+        const loaderDiv = document.getElementById('loader');
+        const resultContainer = document.getElementById('resultContainer');
+        let currentFile = null;
+
+        function handleImageFile(file) {
+            if (sourceImg.src && sourceImg.src.startsWith('blob:')) URL.revokeObjectURL(sourceImg.src);
+            currentFile = file;
+            sourceImg.src = URL.createObjectURL(file);
+            sourceImg.classList.remove('hidden');
+            sourceEmpty.classList.add('hidden');
+            resultImg.classList.add('hidden');
+            resultEmptyDiv.classList.remove('hidden');
+            dlBtn.classList.add('hidden');
+            resultContainer.classList.remove('has-result');
+            document.getElementById('entropyOriginal').innerText = '—';
+            document.getElementById('entropyEncrypted').innerText = '—';
+            document.getElementById('corrOriginal').innerText = '—/—/—';
+            document.getElementById('corrEncrypted').innerText = '—/—/—';
+            if (histOriginalChart) histOriginalChart.destroy();
+            if (histEncryptedChart) histEncryptedChart.destroy();
+            // Reset attack section
+            window._encryptedImageUrl = null;
+            window._encryptedMethod = null;
+            document.getElementById('attackTargetLabel').textContent = 'No encrypted image yet';
+            document.getElementById('useEncryptedBtn').classList.add('hidden');
+            document.getElementById('attackNoTarget').classList.remove('hidden');
+            document.getElementById('attackResults').classList.add('hidden');
+        }
+
+        document.getElementById('upload-trigger').onclick = () => fileInput.click();
+        document.getElementById('drop-zone').onclick = () => fileInput.click();
+        fileInput.onchange = (e) => { if(e.target.files[0]) handleImageFile(e.target.files[0]); };
+        document.getElementById('drop-zone').addEventListener('dragover', (e) => e.preventDefault());
+        document.getElementById('drop-zone').addEventListener('drop', (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) handleImageFile(file);
+        });
+
+        encryptBtn.onclick = async () => {
+            if (!currentFile) { alert('Select an image first'); return; }
+            loaderDiv.classList.remove('hidden');
+            const fd = new FormData();
+            fd.append('image', currentFile);
+            const isHybrid = hybridToggle.checked;
+            let usedMethod = 'DCT';
+            if (isHybrid) {
+                fd.append('hybrid', 'true');
+                fd.append('method1', selectedMethod1);
+                fd.append('method2', selectedMethod2);
+                if (selectedKeyId) { fd.append('key1_id', selectedKeyId); fd.append('key2_id', selectedKeyId); }
+                usedMethod = selectedMethod1; // use first method for attack context
+            } else {
+                const activePill = document.querySelector('#normalSelector .method-pill.active');
+                if (!activePill) { alert('No method selected'); loaderDiv.classList.add('hidden'); return; }
+                usedMethod = activePill.dataset.val;
+                fd.append('method', usedMethod);
+                if (selectedKeyId) fd.append('key_id', selectedKeyId);
+                fd.append('hybrid', 'false');
+            }
+            try {
+                const res = await fetch('/encrypt', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.result_url) {
+                    const resultUrl = data.result_url + '?nocache=' + Date.now();
+                    resultImg.src = resultUrl;
+                    resultImg.classList.remove('hidden');
+                    resultEmptyDiv.classList.add('hidden');
+                    resultImg.classList.add('loaded');
+                    setTimeout(() => resultImg.classList.remove('loaded'), 600);
+                    dlBtn.href = data.result_url;
+                    dlBtn.classList.remove('hidden');
+                    resultContainer.classList.add('has-result');
+                    await analyzeAndCompare(sourceImg.src, resultUrl);
+
+                    // Set up attack section
+                    window._encryptedImageUrl = data.result_url;
+                    window._encryptedMethod = usedMethod;
+                    document.getElementById('attackTargetLabel').textContent = `${data.method_used}`;
+                    document.getElementById('useEncryptedBtn').classList.remove('hidden');
+                    document.getElementById('attackNoTarget').classList.remove('hidden');
+
+                    // Auto-select matching method pill in attack section
+                    document.querySelectorAll('.attack-method-pill').forEach(p => {
+                        p.classList.toggle('active', p.dataset.val === usedMethod);
+                    });
+                    window._attackMethod = usedMethod;
+
+                } else throw new Error(data.error || 'Encryption failed');
+            } catch (err) { alert(err.message); }
+            finally { loaderDiv.classList.add('hidden'); }
+        };
+
+        // ---------- Attack Section Logic ----------
+        const methodListFull = ['DCT','DWT','FFT','Chaos','DNA','ECC','AES','CellularAutomata','CompressiveSensing','RubikCube'];
+        const atkIconMap = { DCT:'fa-chart-line', DWT:'fa-water', FFT:'fa-chart-bar', Chaos:'fa-infinity', DNA:'fa-dna', ECC:'fa-key', AES:'fa-shield-alt', CellularAutomata:'fa-th', CompressiveSensing:'fa-compress', RubikCube:'fa-cube' };
+        const atkPillContainer = document.getElementById('attackMethodPills');
+        methodListFull.forEach(m => {
+            const btn = document.createElement('button');
+            btn.className = `attack-method-pill ${m === 'DCT' ? 'active' : ''}`;
+            btn.dataset.val = m;
+            btn.innerHTML = `<i class="fas ${atkIconMap[m]}"></i> ${m}`;
+            btn.onclick = () => {
+                document.querySelectorAll('.attack-method-pill').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                window._attackMethod = m;
+            };
+            atkPillContainer.appendChild(btn);
+        });
+        window._attackMethod = 'DCT';
+        window._attackType = 'brute_force';
+
+        window.selectAttack = function(type) {
+            window._attackType = type;
+            document.getElementById('btnBruteForce').classList.toggle('active', type === 'brute_force');
+            document.getElementById('btnDifferential').classList.toggle('active', type === 'differential');
+            document.getElementById('btnCompareAll').classList.toggle('active', type === 'compare_all');
+            const descs = {
+                brute_force: '<span class="text-red-400 font-bold">Brute Force:</span> Systematically tries candidate keys/seeds for the target method and measures how close each attempt matches the encrypted image using PSNR and correlation. Higher resistance = harder to crack.',
+                differential: '<span class="text-purple-400 font-bold">Differential Attack:</span> Flips a single bit in the encrypted image and measures how much the output changes (NPCR & UACI). Good encryption creates an avalanche — a tiny change cascades to ~50% pixel difference.',
+                compare_all: '<span class="text-blue-400 font-bold">Full Comparison:</span> Runs both Brute Force and Differential attacks on the selected method and produces an overall resistance score combining both attack vectors.'
+            };
+            document.getElementById('attackDescription').innerHTML = descs[type] || '';
+        };
+
+        window.useEncryptedAsAttackTarget = function() {
+            document.getElementById('attackNoTarget').classList.add('hidden');
+            document.getElementById('attackResults').classList.add('hidden');
+        };
+
+        function _resistanceClass(label) {
+            return { Strong: 'text-green-400', Moderate: 'text-yellow-400', Weak: 'text-orange-400', Vulnerable: 'text-red-400' }[label] || 'text-white';
+        }
+        function _barClass(label) {
+            return { Strong: 'res-strong', Moderate: 'res-moderate', Weak: 'res-weak', Vulnerable: 'res-vulnerable' }[label] || 'res-moderate';
+        }
+        function _ringStroke(label) {
+            return { Strong: '#22c55e', Moderate: '#f59e0b', Weak: '#f97316', Vulnerable: '#ef4444' }[label] || '#22c55e';
+        }
+        function _animateRing(circleEl, score, label, circumference) {
+            const offset = circumference - (score / 100) * circumference;
+            circleEl.style.strokeDashoffset = offset;
+            circleEl.style.stroke = _ringStroke(label);
+        }
+
+        window.runAttack = async function() {
+            const encUrl = window._encryptedImageUrl;
+            if (!encUrl) { alert('Please encrypt an image first, then launch the attack.'); return; }
+            const method = window._attackMethod || 'DCT';
+            const attackType = window._attackType || 'brute_force';
+
+            // Show results panel, hide no-target
+            document.getElementById('attackNoTarget').classList.add('hidden');
+            document.getElementById('attackResults').classList.remove('hidden');
+            document.getElementById('bfResults').classList.add('hidden');
+            document.getElementById('diffResults').classList.add('hidden');
+            document.getElementById('compareResults').classList.add('hidden');
+
+            // Fetch encrypted image as blob
+            let encBlob;
+            try {
+                const imgResp = await fetch(encUrl);
+                encBlob = await imgResp.blob();
+            } catch(e) { alert('Could not fetch encrypted image.'); return; }
+
+            const fd = new FormData();
+            fd.append('image', encBlob, 'encrypted.png');
+            fd.append('method', method);
+
+            // Brute Force
+            if (attackType === 'brute_force') {
+                document.getElementById('bfResults').classList.remove('hidden');
+                document.getElementById('bfLoader').style.display = 'flex';
+                document.getElementById('bfAttackImg').classList.add('hidden');
+                document.getElementById('bfImgEmpty').textContent = '';
+                try {
+                    const res = await fetch('/attack/brute_force', { method: 'POST', body: fd });
+                    const data = await res.json();
+                    if (data.error) { alert(data.error); return; }
+                    // Image
+                    document.getElementById('bfLoader').style.display = 'none';
+                    if (data.attack_image_url) {
+                        const img = document.getElementById('bfAttackImg');
+                        img.src = data.attack_image_url + '?t=' + Date.now();
+                        img.classList.remove('hidden');
+                        document.getElementById('bfImgEmpty').textContent = '';
+                    }
+                    // Metrics
+                    const best = data.best_candidate || {};
+                    document.getElementById('bfPsnr').textContent = best.psnr ?? '—';
+                    document.getElementById('bfCorr').textContent = best.correlation ?? '—';
+                    document.getElementById('bfElapsed').textContent = data.elapsed_seconds ?? '—';
+                    document.getElementById('bfCandidates').textContent = `Candidates tested: ${data.candidates_tested}`;
+                    document.getElementById('bfBestKey').textContent = `Best key: ${best.key ?? '—'}`;
+                    // Score ring
+                    const score = data.resistance_score ?? 0;
+                    const label = data.resistance_label ?? 'Moderate';
+                    document.getElementById('bfScoreNum').textContent = score;
+                    document.getElementById('bfScoreLabel').textContent = label;
+                    document.getElementById('bfScoreLabel').className = `text-xl font-bold ${_resistanceClass(label)}`;
+                    _animateRing(document.getElementById('bfScoreCircle'), score, label, 238.76);
+                    // Top 5 candidates
+                    const listEl = document.getElementById('bfCandidateList');
+                    listEl.innerHTML = (data.top5 || []).map((c, i) => `
+                        <div class="candidate-row">
+                            <span>${i === 0 ? '🥇' : i+1}. key: <span class="text-yellow-300">${c.key}</span></span>
+                            <span>PSNR: <span class="text-blue-300">${c.psnr}</span></span>
+                            <span>Corr: <span class="text-purple-300">${c.correlation}</span></span>
+                        </div>`).join('');
+                } catch(e) { alert('Attack failed: ' + e.message); }
+                finally { document.getElementById('bfLoader').style.display = 'none'; }
+            }
+
+            // Differential
+            else if (attackType === 'differential') {
+                document.getElementById('diffResults').classList.remove('hidden');
+                document.getElementById('diffLoader').style.display = 'flex';
+                document.getElementById('diffAttackImg').classList.add('hidden');
+                document.getElementById('diffImgEmpty').textContent = '';
+                try {
+                    const res = await fetch('/attack/differential', { method: 'POST', body: fd });
+                    const data = await res.json();
+                    if (data.error) { alert(data.error); return; }
+                    document.getElementById('diffLoader').style.display = 'none';
+                    if (data.attack_image_url) {
+                        const img = document.getElementById('diffAttackImg');
+                        img.src = data.attack_image_url + '?t=' + Date.now();
+                        img.classList.remove('hidden');
+                    }
+                    // NPCR / UACI
+                    document.getElementById('diffNpcr').textContent = data.avg_npcr + '%';
+                    document.getElementById('diffUaci').textContent = data.avg_uaci + '%';
+                    document.getElementById('npcrBar').style.width = Math.min(100, (data.avg_npcr / 100) * 100) + '%';
+                    document.getElementById('uaciBar').style.width = Math.min(100, (data.avg_uaci / 33.4) * 100) + '%';
+                    // Score ring
+                    const score = data.resistance_score ?? 0;
+                    const label = data.resistance_label ?? 'Moderate';
+                    document.getElementById('diffScoreNum').textContent = score;
+                    document.getElementById('diffScoreLabel').textContent = label;
+                    document.getElementById('diffScoreLabel').className = `text-xl font-bold ${_resistanceClass(label)}`;
+                    document.getElementById('diffElapsedLabel').textContent = `Time: ${data.elapsed_seconds}s`;
+                    _animateRing(document.getElementById('diffScoreCircle'), score, label, 238.76);
+                    // Per-position
+                    const posEl = document.getElementById('diffPositionList');
+                    posEl.innerHTML = (data.per_position || []).map((p, i) => `
+                        <div class="candidate-row">
+                            <span>Pos [${p.position[0]},${p.position[1]}]</span>
+                            <span>NPCR: <span class="text-orange-300">${p.npcr}%</span></span>
+                            <span>UACI: <span class="text-purple-300">${p.uaci}%</span></span>
+                        </div>`).join('');
+                } catch(e) { alert('Attack failed: ' + e.message); }
+                finally { document.getElementById('diffLoader').style.display = 'none'; }
+            }
+
+            // Compare All
+            else if (attackType === 'compare_all') {
+                document.getElementById('compareResults').classList.remove('hidden');
+                // Show both loaders briefly
+                document.getElementById('bfLoader').style.display = 'flex';
+                try {
+                    const res = await fetch('/attack/compare_all', { method: 'POST', body: fd });
+                    const data = await res.json();
+                    if (data.error) { alert(data.error); return; }
+                    const bf = data.brute_force;
+                    const df = data.differential;
+                    const overall = data.overall_resistance;
+                    const overallLabel = data.overall_label;
+                    // Overall ring
+                    document.getElementById('cmpOverallScore').textContent = overall;
+                    document.getElementById('cmpOverallLabel').textContent = overallLabel;
+                    document.getElementById('cmpOverallLabel').className = `text-lg font-bold ${_resistanceClass(overallLabel)}`;
+                    document.getElementById('cmpMethodLabel').textContent = `Method: ${data.method}`;
+                    _animateRing(document.getElementById('cmpScoreCircle'), overall, overallLabel, 289.03);
+                    // BF card
+                    document.getElementById('cmpBfScore').textContent = bf.resistance_score;
+                    document.getElementById('cmpBfScore').className = `font-bold ${_resistanceClass(bf.resistance_label)}`;
+                    const bfBarEl = document.getElementById('cmpBfBar');
+                    bfBarEl.style.width = bf.resistance_score + '%';
+                    bfBarEl.className = `resistance-bar-fill ${_barClass(bf.resistance_label)}`;
+                    document.getElementById('cmpBfCandidates').textContent = bf.candidates_tested;
+                    document.getElementById('cmpBfBestKey').textContent = bf.best_candidate?.key ?? '—';
+                    document.getElementById('cmpBfLabel').textContent = bf.resistance_label;
+                    document.getElementById('cmpBfLabel').className = `font-bold ${_resistanceClass(bf.resistance_label)}`;
+                    // Diff card
+                    document.getElementById('cmpDiffScore').textContent = df.resistance_score;
+                    document.getElementById('cmpDiffScore').className = `font-bold ${_resistanceClass(df.resistance_label)}`;
+                    const dfBarEl = document.getElementById('cmpDiffBar');
+                    dfBarEl.style.width = df.resistance_score + '%';
+                    dfBarEl.className = `resistance-bar-fill ${_barClass(df.resistance_label)}`;
+                    document.getElementById('cmpNpcr').textContent = df.avg_npcr;
+                    document.getElementById('cmpUaci').textContent = df.avg_uaci;
+                    document.getElementById('cmpDiffLabel').textContent = df.resistance_label;
+                    document.getElementById('cmpDiffLabel').className = `font-bold ${_resistanceClass(df.resistance_label)}`;
+                } catch(e) { alert('Attack failed: ' + e.message); }
+                finally { document.getElementById('bfLoader').style.display = 'none'; }
+            }
+        };
+
+        // ============================================================
+        // DECRYPTION LOGIC
+        // ============================================================
+        let decryptSelectedKeyId = null;
+        let decryptCurrentMethod = 'DCT';
+        const DECRYPT_KEY_METHODS = new Set(['AES', 'Chaos', 'DNA', 'ECC']);
+        const DECRYPT_NON_INVERTIBLE = new Set(['CellularAutomata', 'CompressiveSensing']);
+        function getDecryptKeyMethod(method) {
+            return method === 'AES' ? 'AES' : 'Chaos';
+        }
+
+        function updateDecryptKeyPanel(method) {
+            const panel = document.getElementById('decryptKeyPanel');
+            const badge = document.getElementById('decryptKeyMethodBadge');
+            const hint = document.getElementById('decryptKeyHint');
+            const chaosSeedRow = document.getElementById('decryptChaosSeedRow');
+            const notice = document.getElementById('decryptNonInvertibleNotice');
+            const noticeMethodName = document.getElementById('nonInvertibleMethodName');
+            if (DECRYPT_NON_INVERTIBLE.has(method)) {
+                panel.classList.add('hidden');
+                notice.classList.remove('hidden');
+                noticeMethodName.textContent = method;
+            } else {
+                notice.classList.add('hidden');
+                if (DECRYPT_KEY_METHODS.has(method)) {
+                    panel.classList.remove('hidden');
+                    badge.textContent = method;
+                    if (method === 'AES') {
+                        hint.innerHTML = '<i class="fas fa-info-circle mr-1"></i> Enter the same secret phrase used during encryption.';
+                        chaosSeedRow.classList.add('hidden');
+                    } else {
+                        hint.innerHTML = '<i class="fas fa-info-circle mr-1"></i> Enter the same decimal seed used during encryption (e.g. 0.314159).';
+                        chaosSeedRow.classList.toggle('hidden', method !== 'Chaos');
+                    }
+                } else {
+                    panel.classList.add('hidden');
+                }
+            }
+        }
+
+        function setDecryptActiveKey(keyId, fingerprint) {
+            decryptSelectedKeyId = keyId;
+            const display = document.getElementById('decryptSelectedKeyDisplay');
+            const clearBtn = document.getElementById('decryptClearKeyBtn');
+            if (keyId) {
+                display.textContent = `Active key: ${keyId.slice(0,8)}...${fingerprint ? ' (' + fingerprint + ')' : ''}`;
+                clearBtn.classList.remove('hidden');
+                document.getElementById('decryptKeySelect').innerHTML = `<option value="${keyId}" selected>${keyId}</option>`;
+            } else {
+                display.textContent = 'No key selected — will use default';
+                clearBtn.classList.add('hidden');
+            }
+        }
+
+        document.getElementById('decryptClearKeyBtn').onclick = () => setDecryptActiveKey(null, null);
+
+        // Decrypt method pills
+        const decryptPills = document.querySelectorAll('#decryptMethodPills .method-pill');
+        decryptPills.forEach(pill => {
+            pill.addEventListener('click', () => {
+                decryptPills.forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                decryptCurrentMethod = pill.dataset.val;
+                updateDecryptKeyPanel(decryptCurrentMethod);
+                setDecryptActiveKey(null, null);
+            });
+        });
+        updateDecryptKeyPanel(decryptCurrentMethod);
+
+        document.getElementById('decryptGenerateKeyBtn').onclick = async () => {
+            const method = getDecryptKeyMethod(decryptCurrentMethod);
+            try {
+                const res = await fetch('/generate_key', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ method }) });
+                if (res.ok) { const d = await res.json(); setDecryptActiveKey(d.key_id, d.fingerprint); }
+                else { const e = await res.json(); alert(e.error || 'Generation failed'); }
+            } catch(e) { alert('Server error'); }
+        };
+
+        document.getElementById('decryptApplySeedBtn').onclick = async () => {
+            const seed = document.getElementById('decryptManualSeed').value.trim();
+            if (!seed) return;
+            try {
+                const res = await fetch('/generate_key', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ method: 'Chaos', seed: parseFloat(seed) }) });
+                if (res.ok) { const d = await res.json(); setDecryptActiveKey(d.key_id, d.fingerprint); document.getElementById('decryptManualSeed').value = ''; }
+                else { const e = await res.json(); alert(e.error || 'Seed error'); }
+            } catch(e) { alert('Server error'); }
+        };
+
+        document.getElementById('decryptApplyCustomKeyBtn').onclick = async () => {
+            const rawKey = document.getElementById('decryptCustomKeyInput').value.trim();
+            if (!rawKey) { alert('Please enter a key.'); return; }
+            const method = getDecryptKeyMethod(decryptCurrentMethod);
+            try {
+                const res = await fetch('/generate_key', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ method, raw_key: rawKey }) });
+                if (res.ok) { const d = await res.json(); setDecryptActiveKey(d.key_id, d.fingerprint); document.getElementById('decryptCustomKeyInput').value = ''; }
+                else { const e = await res.json(); alert(e.error || 'Failed'); }
+            } catch(e) { alert('Server error'); }
+        };
+
+        // Decrypt image upload
+        let decryptCurrentFile = null;
+        const decryptSourceImg = document.getElementById('decrypt-source-img');
+        const decryptResultImg = document.getElementById('decrypt-result-img');
+        const decryptSourceEmpty = document.getElementById('decrypt-source-empty');
+        const decryptResultEmpty = document.getElementById('decrypt-result-empty');
+        const decryptDlBtn = document.getElementById('decrypt-dl-btn');
+        const decryptLoader = document.getElementById('decrypt-loader');
+        const decryptResultContainer = document.getElementById('decryptResultContainer');
+
+        function handleDecryptFile(file) {
+            if (decryptSourceImg.src && decryptSourceImg.src.startsWith('blob:')) URL.revokeObjectURL(decryptSourceImg.src);
+            decryptCurrentFile = file;
+            decryptSourceImg.src = URL.createObjectURL(file);
+            decryptSourceImg.classList.remove('hidden');
+            decryptSourceEmpty.classList.add('hidden');
+            decryptResultImg.classList.add('hidden');
+            decryptResultEmpty.classList.remove('hidden');
+            decryptDlBtn.classList.add('hidden');
+            decryptResultContainer.classList.remove('has-result');
+        }
+
+        document.getElementById('decrypt-upload-trigger').onclick = () => document.getElementById('decrypt-file-input').click();
+        document.getElementById('decrypt-drop-zone').onclick = () => document.getElementById('decrypt-file-input').click();
+        document.getElementById('decrypt-file-input').onchange = (e) => { if (e.target.files[0]) handleDecryptFile(e.target.files[0]); };
+        document.getElementById('decrypt-drop-zone').addEventListener('dragover', e => e.preventDefault());
+        document.getElementById('decrypt-drop-zone').addEventListener('drop', e => {
+            e.preventDefault();
+            const f = e.dataTransfer.files[0];
+            if (f && f.type.startsWith('image/')) handleDecryptFile(f);
+        });
+
+        document.getElementById('decrypt-btn').onclick = async () => {
+            if (!decryptCurrentFile) { alert('Please upload an encrypted image first.'); return; }
+            if (DECRYPT_NON_INVERTIBLE.has(decryptCurrentMethod)) {
+                alert(`${decryptCurrentMethod} is a one-way transform and cannot be decrypted.`); return;
+            }
+            decryptLoader.classList.remove('hidden');
+            const fd = new FormData();
+            fd.append('image', decryptCurrentFile);
+            fd.append('method', decryptCurrentMethod);
+            if (decryptSelectedKeyId) fd.append('key_id', decryptSelectedKeyId);
+            try {
+                const res = await fetch('/decrypt', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.result_url) {
+                    const url = data.result_url + '?nocache=' + Date.now();
+                    decryptResultImg.src = url;
+                    decryptResultImg.classList.remove('hidden');
+                    decryptResultEmpty.classList.add('hidden');
+                    decryptResultImg.classList.add('loaded');
+                    setTimeout(() => decryptResultImg.classList.remove('loaded'), 600);
+                    decryptDlBtn.href = data.result_url;
+                    decryptDlBtn.classList.remove('hidden');
+                    decryptResultContainer.classList.add('has-result');
+                    // Show warning if the encrypted image had no color info
+                    const warningEl = document.getElementById('decrypt-color-warning');
+                    if (warningEl) {
+                        if (data.warning) {
+                            warningEl.textContent = '⚠️ ' + data.warning;
+                            warningEl.classList.remove('hidden');
+                        } else {
+                            warningEl.classList.add('hidden');
+                        }
+                    }
+                } else { alert(data.error || 'Decryption failed'); }
+            } catch(e) { alert(e.message); }
+            finally { decryptLoader.classList.add('hidden'); }
+        };
+
+    </script>
+</body>
+</html>
