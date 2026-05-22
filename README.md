@@ -78,7 +78,7 @@ CipherMatrix is a full-stack image encryption system designed to secure digital 
 ### Run Locally
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/CipherMatrix.git
+git clone https://github.com/Rodyyyyy/CipherMatrix.git
 cd CipherMatrix
 
 # Install dependencies
